@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Macro Ledger — Client Nutrition Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#1B2B26;
+    --ink-soft:#2E4038;
+    --bg:#F2F5F0;
+    --card:#FFFFFF;
+    --line:#DDE3DA;
+    --protein:#3E7C59;
+    --carb:#C98A3B;
+    --fat:#7A6BA6;
+    --cal:#1B2B26;
+    --miss:#C1443C;
+    --muted:#6B7A72;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  h1,h2,h3{font-family:'Fraunces',serif;margin:0;}
+  header.top{
+    background:var(--ink);
+    color:#F2F5F0;
+    padding:22px 32px;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  header.top .brand{display:flex;align-items:baseline;gap:10px;}
+  header.top h1{font-size:26px;font-weight:600;letter-spacing:0.2px;}
+  header.top .tag{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#9FB3A8;}
+  nav.tabs{
+    display:flex;
+    gap:2px;
+    background:var(--ink-soft);
+    padding:0 32px;
+    overflow-x:auto;
+  }
+  nav.tabs button{
+    background:none;border:none;color:#CBD8CF;
+    padding:14px 18px;font-family:'Inter',sans-serif;font-weight:600;font-size:14px;
+    cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;
+  }
+  nav.tabs button.active{color:#fff;border-bottom-color:var(--protein);}
+  main{max-width:1100px;margin:0 auto;padding:28px 24px 80px;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px;margin-bottom:20px;}
+  .card h2{font-size:19px;margin-bottom:14px;}
+  .row{display:flex;gap:14px;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:130px;}
+  .field label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
+  input,select{
+    padding:9px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;
+    font-family:'Inter',sans-serif;background:#fff;color:var(--ink);
+  }
+  input:focus,select:focus{outline:2px solid var(--protein);outline-offset:1px;}
+  button.btn{
+    background:var(--ink);color:#fff;border:none;border-radius:6px;padding:10px 18px;
+    font-weight:600;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif;
+  }
+  button.btn.secondary{background:#fff;color:var(--ink);border:1px solid var(--line);}
+  button.btn.danger{background:var(--miss);}
+  button.btn:hover{opacity:0.9;}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);padding:8px 10px;border-bottom:2px solid var(--line);}
+  td{padding:9px 10px;border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:none;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+  .pill.protein{background:#E6F0EA;color:var(--protein);}
+  .pill.carb{background:#FBEDD9;color:var(--carb);}
+  .pill.fat{background:#EEEAF6;color:var(--fat);}
+  .pill.cal{background:#E9EDE7;color:var(--ink);}
+  .client-select{min-width:220px;}
+  .icon-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:15px;padding:2px 6px;}
+  .icon-btn:hover{color:var(--miss);}
+  .rings{display:flex;gap:26px;flex-wrap:wrap;justify-content:flex-start;margin:10px 0 4px;}
+  .ring-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;width:110px;}
+  .ring{width:98px;height:98px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;}
+  .ring::after{content:'';position:absolute;inset:10px;border-radius:50%;background:var(--card);}
+  .ring-val{position:relative;z-index:1;text-align:center;font-family:'IBM Plex Mono',monospace;}
+  .ring-val b{display:block;font-size:16px;}
+  .ring-val span{font-size:10px;color:var(--muted);}
+  .ring-label{font-size:12px;font-weight:600;color:var(--muted);}
+  .status-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;font-family:'IBM Plex Mono',monospace;}
+  .status-badge.met{background:#E6F0EA;color:var(--protein);}
+  .status-badge.miss{background:#FBE7E5;color:var(--miss);}
+  .empty{color:var(--muted);font-size:14px;padding:18px 0;}
+  .settings-note{font-size:13px;color:var(--muted);line-height:1.5;margin-top:8px;}
+  .sync-status{font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--muted);}
+  .sync-status.ok{color:var(--protein);}
+  .sync-status.err{color:var(--miss);}
+  .day-toggle{display:flex;gap:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .day-toggle button{border:none;background:#fff;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);}
+  .day-toggle button.active{background:var(--ink);color:#fff;}
+  .chart-box{max-width:100%;margin-top:10px;}
+  #foodEntries .food-name{font-weight:600;}
+  .food-suggest{
+    position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--line);
+    border-radius:8px;margin-top:4px;max-height:220px;overflow-y:auto;z-index:20;
+    box-shadow:0 8px 20px rgba(0,0,0,0.08);display:none;
+  }
+  .food-suggest.show{display:block;}
+  .food-suggest .fs-item{padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line);}
+  .food-suggest .fs-item:last-child{border-bottom:none;}
+  .food-suggest .fs-item:hover{background:#F2F5F0;}
+  .food-suggest .fs-item small{display:block;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+  .banner{
+    padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;
+    display:flex;align-items:center;gap:8px;font-weight:600;
+  }
+  .banner.warn{background:#FBEDD9;color:#7A5218;}
+  .banner.ok{background:#E6F0EA;color:var(--protein);}
+  @media print{
+    header.top, nav.tabs, .no-print{display:none !important;}
+    body{background:#fff;}
+    main{padding:0;max-width:100%;}
+    .card{border:none;box-shadow:none;page-break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <h1>Macro Ledger</h1>
+  </div>
+  <div class="tag">Client Nutrition Tracking</div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="clients" class="active">Clients</button>
+  <button data-tab="foodlog">Food Log</button>
+  <button data-tab="dashboard">Dashboard</button>
+  <button data-tab="settings">Sync Settings</button>
+</nav>
+
+<main>
+
+  <!-- CLIENTS PANEL -->
+  <section class="panel active" id="panel-clients">
+    <div class="banner no-print" id="storageBanner"></div>
+    <div class="card">
+      <h2 id="clientFormTitle">Add a client</h2>
+      <form id="clientForm">
+        <input type="hidden" id="clientId">
+        <div class="row">
+          <div class="field"><label>Name</label><input type="text" id="c_name"></div>
+          <div class="field"><label>Age</label><input type="number" id="c_age" min="10" max="100"></div>
+          <div class="field"><label>Sex</label>
+            <select id="c_sex"><option value="male">Male</option><option value="female">Female</option></select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <div class="field"><label>Weight (kg)</label><input type="number" step="0.1" id="c_weight"></div>
+          <div class="field"><label>Height (cm)</label><input type="number" step="0.1" id="c_height"></div>
+          <div class="field"><label>Activity level</label>
+            <select id="c_activity">
+              <option value="sedentary">Sedentary (desk job)</option>
+              <option value="light">Light (1-3x/wk)</option>
+              <option value="moderate" selected>Moderate (3-5x/wk)</option>
+              <option value="active">Active (6-7x/wk)</option>
+              <option value="veryactive">Very active (2x/day)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <div class="field"><label>Goal</label>
+            <select id="c_goal">
+              <option value="lose_fat">Lose fat</option>
+              <option value="gain_muscle">Gain muscle</option>
+              <option value="maintain">Maintain</option>
+              <option value="recomp">Body recomposition</option>
+            </select>
+          </div>
+          <div class="field"><label>Calorie target (auto — editable)</label><input type="number" id="c_cal_override"></div>
+          <div class="field"><label>Protein g (auto — editable)</label><input type="number" id="c_protein_override"></div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <div class="field"><label>Carb g (auto — editable)</label><input type="number" id="c_carb_override"></div>
+          <div class="field"><label>Fat g (auto — editable)</label><input type="number" id="c_fat_override"></div>
+          <div class="field" style="justify-content:flex-end;">
+            <button type="button" class="btn secondary" id="recalcBtn">Recalculate targets</button>
+          </div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center;">
+          <button type="submit" class="btn">Save client</button>
+          <button type="button" class="btn secondary" id="cancelEditBtn" style="display:none;">Cancel edit</button>
+          <span id="clientFormError" style="color:var(--miss);font-size:13px;font-weight:600;"></span>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Clients (<span id="clientCount">0</span>)</h2>
+      <table id="clientsTable">
+        <thead><tr><th>Name</th><th>Goal</th><th>Cal</th><th>Protein</th><th>Carb</th><th>Fat</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="clientsEmpty">No clients yet — add one above.</div>
+    </div>
+  </section>
+
+  <!-- FOOD LOG PANEL -->
+  <section class="panel" id="panel-foodlog">
+    <div class="card">
+      <h2>Log food</h2>
+      <div class="row">
+        <div class="field"><label>Client</label>
+          <select id="fl_client" class="client-select"></select>
+        </div>
+        <div class="field"><label>Date</label><input type="date" id="fl_date"></div>
+      </div>
+      <form id="foodForm" style="margin-top:14px;">
+        <div class="row">
+          <div class="field" style="flex:2;min-width:220px;position:relative;">
+            <label>Food / meal</label>
+            <input type="text" id="f_name" placeholder="e.g. Grilled chicken breast" autocomplete="off">
+            <div id="foodSuggest" class="food-suggest"></div>
+          </div>
+          <div class="field" style="max-width:110px;"><label>Amount (g)</label><input type="number" step="1" id="f_grams" value="100"></div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <div class="field"><label>Calories</label><input type="number" step="0.1" id="f_cal"></div>
+          <div class="field"><label>Protein (g)</label><input type="number" step="0.1" id="f_protein"></div>
+          <div class="field"><label>Carb (g)</label><input type="number" step="0.1" id="f_carb"></div>
+          <div class="field"><label>Fat (g)</label><input type="number" step="0.1" id="f_fat"></div>
+        </div>
+        <p class="settings-note" id="lookupNote">Type a food name to search the USDA database, or just fill in the numbers yourself.</p>
+        <div style="margin-top:4px;display:flex;align-items:center;gap:10px;">
+          <button type="submit" class="btn">Add entry</button>
+          <span id="foodFormError" style="color:var(--miss);font-size:13px;font-weight:600;"></span>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Today's entries</h2>
+      <table id="foodEntries">
+        <thead><tr><th>Food</th><th>Cal</th><th>Protein</th><th>Carb</th><th>Fat</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="foodEmpty">No entries logged for this date.</div>
+    </div>
+
+    <div class="card">
+      <h2>Daily total vs target</h2>
+      <div class="rings" id="dailyRings"></div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD PANEL -->
+  <section class="panel" id="panel-dashboard">
+    <div class="card no-print" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;">
+      <div class="field"><label>Client</label><select id="db_client" class="client-select"></select></div>
+      <div class="field"><label>View</label>
+        <div class="day-toggle">
+          <button data-range="day" class="active">Day</button>
+          <button data-range="week">Week</button>
+        </div>
+      </div>
+      <div class="field"><label>Date</label><input type="date" id="db_date"></div>
+      <div class="field" style="flex:0;"><button class="btn secondary" id="printBtn">Print / Save PDF</button></div>
+    </div>
+
+    <div class="card" id="dashboardReport">
+      <h2 id="reportTitle">Report</h2>
+      <div id="reportBody"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS PANEL -->
+  <section class="panel" id="panel-settings">
+    <div class="card">
+      <h2>Where your data lives</h2>
+      <p class="settings-note">
+        Every change is saved instantly to <b>this browser's local storage</b>, so nothing is lost on refresh —
+        even if you never connect a Google Sheet. Connecting a sheet below adds a second copy that is kept in
+        sync automatically, so you can view/back up the data in Google Sheets and access it from other devices.
+      </p>
+    </div>
+    <div class="card">
+      <h2>Google Sheet sync</h2>
+      <p class="settings-note">
+        This app can mirror all client and food-log data to a Google Sheet through a small Google Apps Script
+        "web app" that acts as the connector. Paste your deployed web app URL below, then use
+        <b>Load</b> to pull existing data and <b>Save</b> to write current data back to the sheet.
+        Once a URL is saved, every add/edit/delete auto-syncs a few seconds later.
+        Setup instructions are provided separately — see the message alongside this app.
+      </p>
+      <div class="row" style="margin-top:12px;">
+        <div class="field" style="flex:3;min-width:280px;"><label>Apps Script Web App URL</label>
+          <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/XXXX/exec">
+        </div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn secondary" id="saveUrlBtn">Save URL</button>
+        <button class="btn secondary" id="loadBtn">Load from Sheet</button>
+        <button class="btn" id="pushBtn">Save to Sheet now</button>
+        <span class="sync-status" id="syncStatus"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Auto-fill food nutrition (USDA database)</h2>
+      <p class="settings-note">
+        Add a free USDA FoodData Central API key to look up calories/protein/carb/fat automatically while
+        typing a food name in the Food Log tab — no more manual entry for common foods. Get a free key at
+        <a href="https://fdc.nal.usda.gov/api-key-signup.html" target="_blank" rel="noopener">fdc.nal.usda.gov/api-key-signup.html</a>
+        (instant, just an email). Coverage is strongest for US / packaged / generic foods; dishes without a
+        close match can still be entered manually.
+      </p>
+      <div class="row" style="margin-top:12px;">
+        <div class="field" style="flex:3;min-width:280px;"><label>USDA FoodData Central API key</label>
+          <input type="text" id="usdaKey" placeholder="paste your key here">
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <button class="btn secondary" id="saveUsdaBtn">Save key</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>About auto-calculated targets</h2>
+      <p class="settings-note">
+        Targets use the Mifflin-St Jeor formula for resting metabolic rate, scaled by activity level for
+        total daily energy expenditure, then adjusted by goal: lose fat (-500 kcal, 2.2 g/kg protein),
+        gain muscle (+350 kcal, 2.0 g/kg protein), maintain (2.0 g/kg protein), or recomposition
+        (-200 kcal, 2.2 g/kg protein). Fat is set to 25–30% of calories and the remaining calories
+        become carbohydrate. Every value can be overridden per client on the Clients tab.
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// ---------- state ----------
+let clients = [];      // {id,name,age,sex,weight,height,activity,goal,calTarget,proteinTarget,carbTarget,fatTarget}
+let foodLog = [];       // {id,clientId,date,name,cal,protein,carb,fat}
+let scriptUrl = '';
+let usdaKey = '';
+
+const todayStr = () => new Date().toISOString().slice(0,10);
+
+// ---------- persistence of settings + data (this browser, via localStorage, with safe fallback) ----------
+let storageAvailable = true;
+try{
+  const t='__ml_test__'; localStorage.setItem(t,'1'); localStorage.removeItem(t);
+}catch(e){ storageAvailable = false; }
+
+function loadSettings(){
+  scriptUrl=''; usdaKey='';
+  if(storageAvailable){
+    try{
+      const cfg = JSON.parse(localStorage.getItem('macroledger-config') || '{}');
+      scriptUrl = cfg.scriptUrl || '';
+      usdaKey = cfg.usdaKey || '';
+    }catch(e){ /* ignore corrupt config */ }
+  }
+  document.getElementById('scriptUrl').value = scriptUrl;
+  document.getElementById('usdaKey').value = usdaKey;
+}
+function saveSettings(){
+  if(!storageAvailable) return;
+  try{ localStorage.setItem('macroledger-config', JSON.stringify({scriptUrl, usdaKey})); }catch(e){}
+}
+function loadLocalData(){
+  if(!storageAvailable) return;
+  try{
+    const data = JSON.parse(localStorage.getItem('macroledger-data') || 'null');
+    if(data){ clients = data.clients || []; foodLog = data.foodLog || []; }
+  }catch(e){ /* ignore corrupt cache */ }
+}
+function saveLocalData(){
+  if(!storageAvailable) return;
+  try{ localStorage.setItem('macroledger-data', JSON.stringify({clients, foodLog})); }catch(e){}
+}
+
+let autoSaveTimer = null;
+function onDataChanged(){
+  saveLocalData();
+  updateStorageBanner();
+  if(scriptUrl){
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(()=>{ saveToSheet(true); }, 1500);
+  }
+}
+function updateStorageBanner(){
+  const el = document.getElementById('storageBanner');
+  if(!el) return;
+  if(!storageAvailable){
+    el.className='banner warn';
+    el.textContent = "⚠ This preview can't save between refreshes. Download the file and open it in a normal browser tab (Chrome/Safari) for data to be kept, or connect a Google Sheet below.";
+  }else if(scriptUrl){
+    el.className='banner ok';
+    el.textContent = '✓ Saved in this browser and syncing to your Google Sheet.';
+  }else{
+    el.className='banner warn';
+    el.textContent = '⚠ Saved in this browser only. Go to Sync Settings and connect a Google Sheet to back this up / use it on other devices.';
+  }
+}
+
+// ---------- tabs ----------
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+    if(btn.dataset.tab==='dashboard') renderDashboard();
+    if(btn.dataset.tab==='foodlog') renderFoodLog();
+  });
+});
+
+// ---------- macro calculation ----------
+function calcTargets(c){
+  const age=+c.age, weight=+c.weight, height=+c.height;
+  let bmr = c.sex==='male'
+    ? 10*weight + 6.25*height - 5*age + 5
+    : 10*weight + 6.25*height - 5*age - 161;
+  const actFactors = {sedentary:1.2, light:1.375, moderate:1.55, active:1.725, veryactive:1.9};
+  let tdee = bmr * (actFactors[c.activity]||1.55);
+  let calories, proteinPerKg, fatPct;
+  switch(c.goal){
+    case 'lose_fat':    calories = tdee-500; proteinPerKg=2.2; fatPct=0.25; break;
+    case 'gain_muscle': calories = tdee+350; proteinPerKg=2.0; fatPct=0.25; break;
+    case 'recomp':      calories = tdee-200; proteinPerKg=2.2; fatPct=0.28; break;
+    default:             calories = tdee;     proteinPerKg=1.8; fatPct=0.30;
+  }
+  calories = Math.max(calories, 1200);
+  const proteinG = proteinPerKg*weight;
+  const fatG = (calories*fatPct)/9;
+  const carbG = Math.max(calories - proteinG*4 - fatG*9, 0)/4;
+  return {calTarget:Math.round(calories), proteinTarget:Math.round(proteinG), carbTarget:Math.round(carbG), fatTarget:Math.round(fatG)};
+}
+
+function fillOverrideFields(t){
+  document.getElementById('c_cal_override').value = t.calTarget;
+  document.getElementById('c_protein_override').value = t.proteinTarget;
+  document.getElementById('c_carb_override').value = t.carbTarget;
+  document.getElementById('c_fat_override').value = t.fatTarget;
+}
+
+document.getElementById('recalcBtn').addEventListener('click', ()=>{
+  const c = {
+    age:document.getElementById('c_age').value||0,
+    sex:document.getElementById('c_sex').value,
+    weight:document.getElementById('c_weight').value||0,
+    height:document.getElementById('c_height').value||0,
+    activity:document.getElementById('c_activity').value,
+    goal:document.getElementById('c_goal').value
+  };
+  fillOverrideFields(calcTargets(c));
+});
+
+// ---------- client form ----------
+const clientForm = document.getElementById('clientForm');
+clientForm.addEventListener('submit', e=>{
+  e.preventDefault();
+  const errEl = document.getElementById('clientFormError');
+  errEl.textContent = '';
+  try{
+    const name = document.getElementById('c_name').value.trim();
+    if(!name){ errEl.textContent = 'Please enter a name.'; return; }
+
+    const age = +document.getElementById('c_age').value || 30;
+    const weight = +document.getElementById('c_weight').value || 70;
+    const height = +document.getElementById('c_height').value || 170;
+
+    const id = document.getElementById('clientId').value || ('c'+Date.now());
+    const base = {
+      id, name, age,
+      sex:document.getElementById('c_sex').value,
+      weight, height,
+      activity:document.getElementById('c_activity').value,
+      goal:document.getElementById('c_goal').value
+    };
+    const auto = calcTargets(base);
+    base.calTarget = +document.getElementById('c_cal_override').value || auto.calTarget;
+    base.proteinTarget = +document.getElementById('c_protein_override').value || auto.proteinTarget;
+    base.carbTarget = +document.getElementById('c_carb_override').value || auto.carbTarget;
+    base.fatTarget = +document.getElementById('c_fat_override').value || auto.fatTarget;
+
+    const idx = clients.findIndex(c=>c.id===id);
+    if(idx>=0) clients[idx]=base; else clients.push(base);
+
+    clientForm.reset();
+    document.getElementById('clientId').value='';
+    document.getElementById('clientFormTitle').textContent='Add a client';
+    document.getElementById('cancelEditBtn').style.display='none';
+    renderClients(); populateClientSelects();
+    onDataChanged();
+  }catch(err){
+    errEl.textContent = 'Something went wrong saving this client: ' + err.message;
+  }
+});
+
+document.getElementById('cancelEditBtn').addEventListener('click', ()=>{
+  clientForm.reset();
+  document.getElementById('clientId').value='';
+  document.getElementById('clientFormTitle').textContent='Add a client';
+  document.getElementById('cancelEditBtn').style.display='none';
+});
+
+function editClient(id){
+  const c = clients.find(c=>c.id===id); if(!c) return;
+  document.getElementById('clientId').value=c.id;
+  document.getElementById('c_name').value=c.name;
+  document.getElementById('c_age').value=c.age;
+  document.getElementById('c_sex').value=c.sex;
+  document.getElementById('c_weight').value=c.weight;
+  document.getElementById('c_height').value=c.height;
+  document.getElementById('c_activity').value=c.activity;
+  document.getElementById('c_goal').value=c.goal;
+  document.getElementById('c_cal_override').value=c.calTarget;
+  document.getElementById('c_protein_override').value=c.proteinTarget;
+  document.getElementById('c_carb_override').value=c.carbTarget;
+  document.getElementById('c_fat_override').value=c.fatTarget;
+  document.getElementById('clientFormTitle').textContent='Edit client';
+  document.getElementById('cancelEditBtn').style.display='inline-block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function deleteClient(id){
+  if(!confirm('Delete this client and all their food log entries?')) return;
+  clients = clients.filter(c=>c.id!==id);
+  foodLog = foodLog.filter(f=>f.clientId!==id);
+  renderClients(); populateClientSelects(); renderFoodLog();
+  onDataChanged();
+}
+
+function renderClients(){
+  const tbody = document.querySelector('#clientsTable tbody');
+  tbody.innerHTML='';
+  document.getElementById('clientCount').textContent = clients.length;
+  document.getElementById('clientsEmpty').style.display = clients.length? 'none':'block';
+  clients.forEach(c=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(c.name)}</td>
+      <td>${goalLabel(c.goal)}</td>
+      <td class="mono">${c.calTarget}</td>
+      <td class="mono">${c.proteinTarget}g</td>
+      <td class="mono">${c.carbTarget}g</td>
+      <td class="mono">${c.fatTarget}g</td>
+      <td>
+        <button class="icon-btn" title="Edit" onclick="editClient('${c.id}')">✎</button>
+        <button class="icon-btn" title="Delete" onclick="deleteClient('${c.id}')">✕</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+function goalLabel(g){
+  return {lose_fat:'Lose fat', gain_muscle:'Gain muscle', maintain:'Maintain', recomp:'Recomposition'}[g] || g;
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+function populateClientSelects(){
+  ['fl_client','db_client'].forEach(id=>{
+    const sel = document.getElementById(id);
+    const current = sel.value;
+    sel.innerHTML = clients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('') || '<option value="">No clients yet</option>';
+    if(clients.some(c=>c.id===current)) sel.value = current;
+  });
+}
+
+// ---------- food log ----------
+document.getElementById('fl_date').value = todayStr();
+document.getElementById('db_date').value = todayStr();
+
+document.getElementById('foodForm').addEventListener('submit', e=>{
+  e.preventDefault();
+  const errEl = document.getElementById('foodFormError');
+  errEl.textContent = '';
+  try{
+    const clientId = document.getElementById('fl_client').value;
+    if(!clientId){ errEl.textContent = 'Add a client first (Clients tab).'; return; }
+    const name = document.getElementById('f_name').value.trim();
+    if(!name){ errEl.textContent = 'Please enter a food name.'; return; }
+    const entry = {
+      id:'f'+Date.now(),
+      clientId,
+      date:document.getElementById('fl_date').value || todayStr(),
+      name,
+      cal:+document.getElementById('f_cal').value || 0,
+      protein:+document.getElementById('f_protein').value || 0,
+      carb:+document.getElementById('f_carb').value || 0,
+      fat:+document.getElementById('f_fat').value || 0
+    };
+    foodLog.push(entry);
+    document.getElementById('foodForm').reset();
+    document.getElementById('f_grams').value = 100;
+    hideSuggestions();
+    renderFoodLog();
+    onDataChanged();
+  }catch(err){
+    errEl.textContent = 'Something went wrong adding this entry: ' + err.message;
+  }
+});
+document.getElementById('fl_client').addEventListener('change', renderFoodLog);
+document.getElementById('fl_date').addEventListener('change', renderFoodLog);
+
+function deleteFoodEntry(id){
+  foodLog = foodLog.filter(f=>f.id!==id);
+  renderFoodLog();
+  onDataChanged();
+}
+
+// ---------- USDA FoodData Central lookup ----------
+let usdaTimer = null;
+let usdaResults = [];
+const foodNameInput = document.getElementById('f_name');
+const suggestBox = document.getElementById('foodSuggest');
+
+foodNameInput.addEventListener('input', ()=>{
+  clearTimeout(usdaTimer);
+  const q = foodNameInput.value.trim();
+  if(!usdaKey || q.length < 2){ hideSuggestions(); return; }
+  usdaTimer = setTimeout(()=>searchUsda(q), 400);
+});
+document.addEventListener('click', e=>{
+  if(!suggestBox.contains(e.target) && e.target !== foodNameInput) hideSuggestions();
+});
+function hideSuggestions(){ suggestBox.classList.remove('show'); suggestBox.innerHTML=''; }
+
+async function searchUsda(query){
+  try{
+    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(usdaKey)}&query=${encodeURIComponent(query)}&pageSize=8&dataType=Foundation,SR%20Legacy,Survey%20(FNDDS),Branded`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    usdaResults = data.foods || [];
+    renderSuggestions();
+  }catch(e){
+    hideSuggestions();
+  }
+}
+function nutrientPer100g(food, names){
+  for(const n of (food.foodNutrients||[])){
+    if(names.includes(n.nutrientName)) return n.value || 0;
+  }
+  return 0;
+}
+function renderSuggestions(){
+  if(!usdaResults.length){ hideSuggestions(); return; }
+  suggestBox.innerHTML = usdaResults.map((f,i)=>{
+    const cal = nutrientPer100g(f,['Energy']);
+    const brand = f.brandOwner ? ` · ${escapeHtml(f.brandOwner)}` : '';
+    return `<div class="fs-item" data-idx="${i}">${escapeHtml(f.description)}${brand}
+      <small>${Math.round(cal)} kcal / 100g</small></div>`;
+  }).join('');
+  suggestBox.classList.add('show');
+  suggestBox.querySelectorAll('.fs-item').forEach(el=>{
+    el.addEventListener('click', ()=>selectUsdaFood(usdaResults[+el.dataset.idx]));
+  });
+}
+function selectUsdaFood(food){
+  const grams = +document.getElementById('f_grams').value || 100;
+  const per100 = {
+    cal: nutrientPer100g(food, ['Energy']),
+    protein: nutrientPer100g(food, ['Protein']),
+    carb: nutrientPer100g(food, ['Carbohydrate, by difference']),
+    fat: nutrientPer100g(food, ['Total lipid (fat)'])
+  };
+  foodNameInput.value = food.description;
+  document.getElementById('f_cal').value = Math.round(per100.cal*grams/100);
+  document.getElementById('f_protein').value = +(per100.protein*grams/100).toFixed(1);
+  document.getElementById('f_carb').value = +(per100.carb*grams/100).toFixed(1);
+  document.getElementById('f_fat').value = +(per100.fat*grams/100).toFixed(1);
+  foodNameInput.dataset.per100 = JSON.stringify(per100);
+  hideSuggestions();
+}
+document.getElementById('f_grams').addEventListener('input', ()=>{
+  const per100 = foodNameInput.dataset.per100 ? JSON.parse(foodNameInput.dataset.per100) : null;
+  if(!per100) return;
+  const grams = +document.getElementById('f_grams').value || 0;
+  document.getElementById('f_cal').value = Math.round(per100.cal*grams/100);
+  document.getElementById('f_protein').value = +(per100.protein*grams/100).toFixed(1);
+  document.getElementById('f_carb').value = +(per100.carb*grams/100).toFixed(1);
+  document.getElementById('f_fat').value = +(per100.fat*grams/100).toFixed(1);
+});
+
+function renderFoodLog(){
+  const clientId = document.getElementById('fl_client').value;
+  const date = document.getElementById('fl_date').value || todayStr();
+  const entries = foodLog.filter(f=>f.clientId===clientId && f.date===date);
+  const tbody = document.querySelector('#foodEntries tbody');
+  tbody.innerHTML='';
+  document.getElementById('foodEmpty').style.display = entries.length? 'none':'block';
+  entries.forEach(f=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td class="food-name">${escapeHtml(f.name)}</td>
+      <td class="mono">${f.cal}</td><td class="mono">${f.protein}g</td>
+      <td class="mono">${f.carb}g</td><td class="mono">${f.fat}g</td>
+      <td><button class="icon-btn" onclick="deleteFoodEntry('${f.id}')">✕</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  const client = clients.find(c=>c.id===clientId);
+  const totals = entries.reduce((a,f)=>({cal:a.cal+f.cal,protein:a.protein+f.protein,carb:a.carb+f.carb,fat:a.fat+f.fat}),{cal:0,protein:0,carb:0,fat:0});
+  const ringsEl = document.getElementById('dailyRings');
+  if(!client){ ringsEl.innerHTML = '<div class="empty">Select a client to see progress.</div>'; return; }
+  ringsEl.innerHTML = ring('Calories', totals.cal, client.calTarget, 'cal', '')
+    + ring('Protein', totals.protein, client.proteinTarget, 'protein', 'g')
+    + ring('Carbs', totals.carb, client.carbTarget, 'carb', 'g')
+    + ring('Fat', totals.fat, client.fatTarget, 'fat', 'g');
+}
+
+function macroColor(kind){ return {protein:'#3E7C59',carb:'#C98A3B',fat:'#7A6BA6',cal:'#1B2B26'}[kind]; }
+function ring(label, val, target, kind, unit){
+  const pct = target>0 ? Math.min(val/target,1.15) : 0;
+  const deg = Math.min(pct,1)*360;
+  const color = macroColor(kind);
+  const over = val>target*1.1;
+  return `<div class="ring-wrap">
+    <div class="ring" style="background:conic-gradient(${over?'var(--miss)':color} ${deg}deg, #E7EAE5 0deg);">
+      <div class="ring-val"><b>${Math.round(val)}${unit}</b><span>/ ${Math.round(target)}${unit}</span></div>
+    </div>
+    <div class="ring-label">${label}</div>
+  </div>`;
+}
+
+// ---------- dashboard ----------
+let dbRange = 'day';
+document.querySelectorAll('.day-toggle button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.day-toggle button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    dbRange = b.dataset.range;
+    renderDashboard();
+  });
+});
+document.getElementById('db_client').addEventListener('change', renderDashboard);
+document.getElementById('db_date').addEventListener('change', renderDashboard);
+document.getElementById('printBtn').addEventListener('click', ()=>window.print());
+
+let dashChart = null;
+function dateRangeForWeek(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const day = d.getDay(); // 0 Sun
+  const monday = new Date(d); monday.setDate(d.getDate() - ((day+6)%7));
+  const days=[];
+  for(let i=0;i<7;i++){ const x=new Date(monday); x.setDate(monday.getDate()+i); days.push(x.toISOString().slice(0,10)); }
+  return days;
+}
+function totalsFor(clientId, date){
+  return foodLog.filter(f=>f.clientId===clientId && f.date===date)
+    .reduce((a,f)=>({cal:a.cal+f.cal,protein:a.protein+f.protein,carb:a.carb+f.carb,fat:a.fat+f.fat}),{cal:0,protein:0,carb:0,fat:0});
+}
+function withinTarget(val, target, tolerance=0.1){
+  if(target<=0) return true;
+  return Math.abs(val-target) <= target*tolerance || val>=target*(1-tolerance);
+}
+
+function renderDashboard(){
+  const clientId = document.getElementById('db_client').value;
+  const client = clients.find(c=>c.id===clientId);
+  const date = document.getElementById('db_date').value || todayStr();
+  const body = document.getElementById('reportBody');
+  if(!client){ body.innerHTML='<div class="empty">Add a client to view a report.</div>'; return; }
+
+  if(dbRange==='day'){
+    document.getElementById('reportTitle').textContent = `${client.name} — Daily report — ${date}`;
+    const t = totalsFor(clientId, date);
+    const rows = [
+      ['Calories', t.cal, client.calTarget, ''],
+      ['Protein', t.protein, client.proteinTarget, 'g'],
+      ['Carbs', t.carb, client.carbTarget, 'g'],
+      ['Fat', t.fat, client.fatTarget, 'g']
+    ];
+    body.innerHTML = `
+      <div class="rings">${ring('Calories',t.cal,client.calTarget,'cal','')}${ring('Protein',t.protein,client.proteinTarget,'protein','g')}${ring('Carbs',t.carb,client.carbTarget,'carb','g')}${ring('Fat',t.fat,client.fatTarget,'fat','g')}</div>
+      <table style="margin-top:18px;"><thead><tr><th>Metric</th><th>Actual</th><th>Target</th><th>Status</th></tr></thead>
+      <tbody>${rows.map(r=>{
+        const met = withinTarget(r[1],r[2]);
+        return `<tr><td>${r[0]}</td><td class="mono">${Math.round(r[1])}${r[3]}</td><td class="mono">${Math.round(r[2])}${r[3]}</td>
+        <td><span class="status-badge ${met?'met':'miss'}">${met?'On target':'Missed'}</span></td></tr>`;
+      }).join('')}</tbody></table>`;
+  } else {
+    const days = dateRangeForWeek(date);
+    document.getElementById('reportTitle').textContent = `${client.name} — Weekly report — ${days[0]} to ${days[6]}`;
+    const dayTotals = days.map(d=>totalsFor(clientId,d));
+    let metCount=0;
+    const rowsHtml = days.map((d,i)=>{
+      const t = dayTotals[i];
+      const met = withinTarget(t.cal, client.calTarget) && withinTarget(t.protein, client.proteinTarget);
+      if(met) metCount++;
+      return `<tr><td>${d}</td><td class="mono">${Math.round(t.cal)}</td><td class="mono">${Math.round(t.protein)}g</td>
+        <td class="mono">${Math.round(t.carb)}g</td><td class="mono">${Math.round(t.fat)}g</td>
+        <td><span class="status-badge ${met?'met':'miss'}">${met?'On target':'Missed'}</span></td></tr>`;
+    }).join('');
+    body.innerHTML = `
+      <p class="settings-note">${metCount} of 7 days on target (calories &amp; protein within 10% of goal).</p>
+      <div class="chart-box"><canvas id="weekChart" height="110"></canvas></div>
+      <table style="margin-top:18px;"><thead><tr><th>Date</th><th>Cal</th><th>Protein</th><th>Carb</th><th>Fat</th><th>Status</th></tr></thead>
+      <tbody>${rowsHtml}</tbody></table>`;
+
+    const ctx = document.getElementById('weekChart').getContext('2d');
+    if(dashChart) dashChart.destroy();
+    dashChart = new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels: days.map(d=>d.slice(5)),
+        datasets:[
+          {label:'Calories', data:dayTotals.map(t=>t.cal), backgroundColor:'#1B2B26'},
+          {label:'Protein g', data:dayTotals.map(t=>t.protein), backgroundColor:'#3E7C59'},
+          {label:'Carb g', data:dayTotals.map(t=>t.carb), backgroundColor:'#C98A3B'},
+          {label:'Fat g', data:dayTotals.map(t=>t.fat), backgroundColor:'#7A6BA6'}
+        ]
+      },
+      options:{responsive:true, plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true}}}
+    });
+  }
+}
+
+// ---------- Google Sheet sync ----------
+document.getElementById('saveUrlBtn').addEventListener('click', ()=>{
+  scriptUrl = document.getElementById('scriptUrl').value.trim();
+  saveSettings();
+  updateStorageBanner();
+  setSync('URL saved.', 'ok');
+});
+document.getElementById('saveUsdaBtn').addEventListener('click', ()=>{
+  usdaKey = document.getElementById('usdaKey').value.trim();
+  saveSettings();
+  setSync('USDA key saved.', 'ok');
+});
+document.getElementById('loadBtn').addEventListener('click', ()=>loadFromSheet(false));
+document.getElementById('pushBtn').addEventListener('click', ()=>saveToSheet(false));
+
+function setSync(msg, cls){
+  const el = document.getElementById('syncStatus');
+  el.textContent = msg;
+  el.className = 'sync-status'+(cls?(' '+cls):'');
+}
+
+async function loadFromSheet(silent){
+  if(!scriptUrl){ if(!silent) setSync('Add and save a web app URL first.', 'err'); return; }
+  if(!silent) setSync('Loading…');
+  try{
+    const res = await fetch(scriptUrl + '?action=load');
+    const data = await res.json();
+    clients = (data.clients||[]).map(normalizeClient);
+    foodLog = (data.foodLog||[]).map(normalizeFood);
+    saveLocalData();
+    renderClients(); populateClientSelects(); renderFoodLog(); renderDashboard();
+    setSync('Loaded from Google Sheet.', 'ok');
+  }catch(e){
+    setSync('Load failed — check the URL and deployment access.', 'err');
+  }
+}
+async function saveToSheet(silent){
+  if(!scriptUrl){ if(!silent) setSync('Add and save a web app URL first.', 'err'); return; }
+  if(!silent) setSync('Saving…');
+  try{
+    await fetch(scriptUrl, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({clients, foodLog})
+    });
+    setSync(silent ? 'Auto-synced to Google Sheet.' : 'Saved to Google Sheet.', 'ok');
+  }catch(e){
+    setSync('Save failed — check the URL and deployment access.', 'err');
+  }
+}
+function normalizeClient(c){
+  return {
+    id:String(c.id), name:c.name, age:+c.age, sex:c.sex, weight:+c.weight, height:+c.height,
+    activity:c.activity, goal:c.goal, calTarget:+c.calTarget, proteinTarget:+c.proteinTarget,
+    carbTarget:+c.carbTarget, fatTarget:+c.fatTarget
+  };
+}
+function normalizeFood(f){
+  return { id:String(f.id), clientId:String(f.clientId), date:f.date, name:f.name, cal:+f.cal, protein:+f.protein, carb:+f.carb, fat:+f.fat };
+}
+
+// ---------- init ----------
+(async function init(){
+  try{
+    loadSettings();
+    loadLocalData();
+    populateClientSelects();
+    renderClients();
+    renderFoodLog();
+    updateStorageBanner();
+    if(scriptUrl){ await loadFromSheet(true); populateClientSelects(); renderClients(); renderFoodLog(); }
+  }catch(err){
+    console.error('Macro Ledger init error:', err);
+  }
+})();
+</script>
+</body>
+</html>
